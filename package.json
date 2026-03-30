@@ -1,0 +1,13 @@
+{
+  "name": "polymarket-copycat",
+  "version": "1.0.0",
+  "description": "Polymarket copy trading — scanner, paper trading, and live execution",
+  "type": "module",
+  "scripts": {
+    "scan": "node src/scanner.js",
+    "paper": "node src/paper-trader.js",
+    "dashboard": "node src/dashboard.js",
+    "live": "echo 'Set LIVE_MODE=true in .env first' && node src/live-trader.js"
+  },
+  "dependencies": {}
+}
