@@ -4,10 +4,21 @@
   "description": "Polymarket copy trading — scanner, paper trading, and live execution",
   "type": "module",
   "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "bun test",
+    "mutation": "stryker run",
+    "check": "bun run typecheck && bun run lint",
     "scan": "node src/scanner.js",
     "paper": "node src/paper-trader.js",
     "dashboard": "node src/dashboard.js",
     "live": "echo 'Set LIVE_MODE=true in .env first' && node src/live-trader.js"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "eslint": "^10.8.0",
+    "typescript-eslint": "^8.65.0"
+  }
 }
