@@ -1,10 +1,10 @@
 /**
  * Pull and display the Polymarket leaderboard.
  *
- * Usage: node src/leaderboard.js [--count 50] [--period all|weekly|monthly]
+ * Usage: bun src/leaderboard.ts [--count 50] [--period all|weekly|monthly]
  */
 
-import { getTopTraders } from "./api.js";
+import { getTopTraders, asText, pick, pickStr } from "./api.ts";
 
 const args = process.argv.slice(2);
 const count = parseInt(args.find((_, i) => args[i - 1] === "--count") || "50");
@@ -25,14 +25,14 @@ try {
   console.log("-".repeat(110));
 
   traders.forEach((t, i) => {
-    const addr = t.proxyWallet || t.address || t.wallet || "unknown";
-    const profit = t.pnl || t.profit || 0;
-    const volume = t.vol || t.volume || 0;
-    const markets = t.markets_traded || t.num_markets || "?";
-    const name = t.userName || t.username || t.name || "";
+    const addr = pickStr(t, ["proxyWallet", "address", "wallet"], "unknown");
+    const profit = pick(t, "pnl", "profit") ?? 0;
+    const volume = pick(t, "vol", "volume") ?? 0;
+    const markets = asText(pick(t, "markets_traded", "num_markets"), "?");
+    const name = pickStr(t, ["userName", "username", "name"]);
 
     console.log(
-      `${String(i + 1).padStart(4)} | ${addr.padEnd(44)} | ${formatUSD(profit).padStart(12)} | ${formatUSD(volume).padStart(12)} | ${String(markets).padStart(7)} | ${name}`
+      `${String(i + 1).padStart(4)} | ${addr.padEnd(44)} | ${formatUSD(profit).padStart(12)} | ${formatUSD(volume).padStart(12)} | ${markets.padStart(7)} | ${name}`
     );
   });
 
@@ -44,12 +44,12 @@ try {
   writeFileSync(outPath, JSON.stringify(traders, null, 2));
   console.log(`Saved to ${outPath}`);
 } catch (err) {
-  console.error("Error fetching leaderboard:", err.message);
+  console.error("Error fetching leaderboard:", err instanceof Error ? err.message : err);
   process.exit(1);
 }
 
-function formatUSD(n) {
-  const num = parseFloat(n) || 0;
+function formatUSD(n: unknown): string {
+  const num = parseFloat(asText(n, "")) || 0;
   if (Math.abs(num) >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
   if (Math.abs(num) >= 1000) return `$${(num / 1000).toFixed(1)}K`;
   return `$${num.toFixed(2)}`;

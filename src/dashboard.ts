@@ -1,13 +1,13 @@
 /**
  * Live dashboard — web UI for monitoring paper trading performance.
  *
- * Usage: node src/dashboard.js
+ * Usage: bun src/dashboard.ts
  * Then open http://localhost:3500
  */
 
 import { createServer } from "http";
-import { Store } from "./store.js";
-import { config } from "./config.js";
+import { Store } from "./store.ts";
+import { config } from "./config.ts";
 
 const store = new Store();
 const PORT = config.dashboardPort;
@@ -127,7 +127,7 @@ const HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-const server = createServer(async (req, res) => {
+const server = createServer((req, res) => {
   if (req.url === "/api/status") {
     const summary = store.getSummary();
     res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });

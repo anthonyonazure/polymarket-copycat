@@ -2,14 +2,18 @@
  * Full scanner — leaderboard → analyze → rank → recommend.
  *
  * Usage:
- *   node src/scanner.js                    # Scan top 50, analyze, rank
- *   node src/scanner.js --count 100        # Scan top 100
- *   node src/scanner.js --quick            # Leaderboard only, no deep analysis
+ *   bun src/scanner.ts                    # Scan top 50, analyze, rank
+ *   bun src/scanner.ts --count 100        # Scan top 100
+ *   bun src/scanner.ts --quick            # Leaderboard only, no deep analysis
  */
 
-import { getTopTraders, getWalletAllActivity, getProfile, sleep } from "./api.js";
-import { rankWallets } from "./scorer.js";
+import { getTopTraders, getLeaderboard, getWalletAllActivity, sleep, asList, pick, pickNum, pickOptStr, pickStr } from "./api.ts";
+import type { JsonObject } from "./api.ts";
+import { rankWallets } from "./scorer.ts";
+import type { ScoredWallet, WalletInput, WalletTrade } from "./scorer.ts";
 import { writeFileSync } from "fs";
+
+type Leader = JsonObject & { weeklyActive: boolean; weeklyPnl: number };
 
 const args = process.argv.slice(2);
 const count = parseInt(args.find((_, i) => args[i - 1] === "--count") || "50");
@@ -24,36 +28,35 @@ console.log("=".repeat(70) + "\n");
 
 // Step 1: Get leaderboard — merge all-time + weekly for recency signal
 console.log("Step 1: Fetching leaderboards...");
-const { getLeaderboard } = await import("./api.js");
 
 const allTimeLeaders = await getTopTraders(count);
 console.log(`  All-time: ${allTimeLeaders.length} traders`);
 
 await sleep(500);
 const weeklyBatch = await getLeaderboard("WEEK", 50, 0);
-const weeklyLeaders = Array.isArray(weeklyBatch) ? weeklyBatch : weeklyBatch?.data || [];
+const weeklyLeaders = asList(weeklyBatch, "data");
 console.log(`  Weekly:   ${weeklyLeaders.length} traders`);
 
 // Build a set of weekly-active addresses for recency boost
-const weeklyActive = new Set(weeklyLeaders.map((t) => (t.proxyWallet || t.address || "").toLowerCase()));
-const weeklyPnl = {};
+const weeklyActive = new Set(weeklyLeaders.map((t) => pickStr(t, ["proxyWallet", "address"]).toLowerCase()));
+const weeklyPnl: Record<string, number> = {};
 weeklyLeaders.forEach((t) => {
-  const addr = (t.proxyWallet || t.address || "").toLowerCase();
-  weeklyPnl[addr] = parseFloat(t.pnl || t.profit || 0);
+  const addr = pickStr(t, ["proxyWallet", "address"]).toLowerCase();
+  weeklyPnl[addr] = pickNum(t, "pnl", "profit");
 });
 
 // Merge: start with all-time, tag weekly-active ones
-const leaders = allTimeLeaders.map((t) => {
-  const addr = (t.proxyWallet || t.address || "").toLowerCase();
+const leaders: Leader[] = allTimeLeaders.map((t) => {
+  const addr = pickStr(t, ["proxyWallet", "address"]).toLowerCase();
   return { ...t, weeklyActive: weeklyActive.has(addr), weeklyPnl: weeklyPnl[addr] || 0 };
 });
 
 // Add any weekly leaders not in all-time top
-const allTimeAddrs = new Set(leaders.map((t) => (t.proxyWallet || t.address || "").toLowerCase()));
+const allTimeAddrs = new Set(leaders.map((t) => pickStr(t, ["proxyWallet", "address"]).toLowerCase()));
 for (const t of weeklyLeaders) {
-  const addr = (t.proxyWallet || t.address || "").toLowerCase();
+  const addr = pickStr(t, ["proxyWallet", "address"]).toLowerCase();
   if (!allTimeAddrs.has(addr)) {
-    leaders.push({ ...t, weeklyActive: true, weeklyPnl: parseFloat(t.pnl || 0) });
+    leaders.push({ ...t, weeklyActive: true, weeklyPnl: pickNum(t, "pnl") });
   }
 }
 
@@ -68,9 +71,9 @@ if (!leaders.length) {
 if (quick) {
   // Quick mode — just show leaderboard with basic info
   leaders.forEach((t, i) => {
-    const addr = t.proxyWallet || t.address || t.wallet || "?";
-    const profit = parseFloat(t.pnl || t.profit || 0);
-    const name = t.userName || t.username || t.name || "";
+    const addr = pickStr(t, ["proxyWallet", "address", "wallet"], "?");
+    const profit = pickNum(t, "pnl", "profit");
+    const name = pickStr(t, ["userName", "username", "name"]);
     console.log(`${String(i + 1).padStart(3)}. ${addr.slice(0, 10)}...${addr.slice(-4)} | ${formatUSD(profit).padStart(10)} | ${name}`);
   });
   writeFileSync("leaderboard.json", JSON.stringify(leaders, null, 2));
@@ -81,35 +84,38 @@ if (quick) {
 // Step 2: Deep analysis
 console.log("Step 2: Analyzing trade histories...\n");
 
-const wallets = [];
+const wallets: WalletInput[] = [];
 
-for (let i = 0; i < leaders.length; i++) {
-  const t = leaders[i];
-  const addr = t.proxyWallet || t.address || t.wallet;
+for (const [i, t] of leaders.entries()) {
+  const addr = pickOptStr(t, "proxyWallet", "address", "wallet");
   if (!addr) continue;
 
-  const name = t.userName || t.username || t.name || "";
-  const profit = parseFloat(t.pnl || t.profit || 0);
+  const name = pickStr(t, ["userName", "username", "name"]);
+  const profit = pickNum(t, "pnl", "profit");
 
   process.stdout.write(`  [${i + 1}/${leaders.length}] ${(name || addr.slice(0, 10)).padEnd(20)}`);
 
   try {
     const activity = await getWalletAllActivity(addr, 5); // 5 pages max for speed
-    const trades = activity.map((a) => ({
-      timestamp: a.timestamp || a.created_at || a.createdAt,
-      side: a.side || a.type || "",
-      size: parseFloat(a.size || a.amount || a.usdcSize || 0),
-      price: parseFloat(a.price || a.avgPrice || 0),
-      market_id: a.market || a.conditionId || a.condition_id,
-      pnl: parseFloat(a.pnl || a.profit || 0),
-      resolved: a.resolved || a.isResolved || false,
-    }));
+    const trades = activity.map((a): WalletTrade => {
+      const timestamp = pick(a, "timestamp", "created_at", "createdAt");
+      return {
+        timestamp: typeof timestamp === "string" || typeof timestamp === "number" ? timestamp : undefined,
+        side: pickStr(a, ["side", "type"]),
+        size: pickNum(a, "size", "amount", "usdcSize"),
+        price: pickNum(a, "price", "avgPrice"),
+        market_id: pick(a, "market", "conditionId", "condition_id"),
+        pnl: pickNum(a, "pnl", "profit"),
+        resolved: pick(a, "resolved", "isResolved") || false,
+      };
+    });
 
     wallets.push({ address: addr, username: name, profit, trades, weeklyActive: t.weeklyActive || false, weeklyPnl: t.weeklyPnl || 0 });
     console.log(`${trades.length} trades${t.weeklyActive ? " [ACTIVE THIS WEEK]" : ""}`);
   } catch (err) {
     wallets.push({ address: addr, username: name, profit, trades: [], weeklyActive: t.weeklyActive || false, weeklyPnl: t.weeklyPnl || 0 });
-    console.log(`error: ${err.message.slice(0, 40)}`);
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(`error: ${message.slice(0, 40)}`);
   }
 
   await sleep(300);
@@ -160,17 +166,19 @@ console.log(`  1. Review the top wallets on polymarket.com/profile/<address>`);
 console.log(`  2. Run what-if simulation: node src/whatif.js --top 5`);
 console.log(`  3. Use top-wallets.txt with the copy trading bot`);
 
-function printRecommendation(w, i) {
+function printRecommendation(w: ScoredWallet, i: number): void {
   const m = w.metrics;
+  // metrics carries no winRate; the line has always printed "undefined" there.
+  const winRate = (m as Partial<Record<"winRate", number>>).winRate;
   console.log(`${i + 1}. ${w.address}`);
   console.log(`   ${w.username || "Anonymous"} | Score: ${w.score}/100 (${w.grade})`);
-  console.log(`   Win: ${m.winRate}% | Profit: ${formatUSD(m.profit)} | ${m.totalTrades} trades across ${m.diversity} markets`);
+  console.log(`   Win: ${String(winRate)}% | Profit: ${formatUSD(m.profit)} | ${m.totalTrades} trades across ${m.diversity} markets`);
   console.log(`   ${m.recentTrades} trades in last 7 days | Consistency: ${m.consistency}%`);
   console.log();
 }
 
-function formatUSD(n) {
-  const num = parseFloat(n) || 0;
+function formatUSD(n: number): string {
+  const num = parseFloat(String(n)) || 0;
   if (Math.abs(num) >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
   if (Math.abs(num) >= 1000) return `$${(num / 1000).toFixed(1)}K`;
   return `$${num.toFixed(2)}`;

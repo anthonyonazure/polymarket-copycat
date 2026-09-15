@@ -1,13 +1,30 @@
 {
   "name": "polymarket-copycat",
   "version": "1.0.0",
-  "description": "Polymarket copy trading — scanner, paper trading, and live execution",
+  "description": "Polymarket copy trading \u2014 scanner, paper trading, and live execution",
   "type": "module",
   "scripts": {
-    "scan": "node src/scanner.js",
-    "paper": "node src/paper-trader.js",
-    "dashboard": "node src/dashboard.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "bun test",
+    "mutation": "stryker run",
+    "check": "bun run typecheck && bun run lint",
+    "scan": "bun src/scanner.ts",
+    "paper": "bun src/paper-trader.ts",
+    "dashboard": "bun src/dashboard.ts",
     "live": "echo 'Set LIVE_MODE=true in .env first' && node src/live-trader.js"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "@types/bun": "^1.3.14",
+    "eslint": "^10.8.0",
+    "globals": "^17.4.0",
+    "typescript-eslint": "^8.65.0"
+  },
+  "overrides": {
+    "fast-uri": "^3.1.6",
+    "qs": "^6.16.0"
+  }
 }
