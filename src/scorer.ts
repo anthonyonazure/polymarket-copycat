@@ -9,7 +9,58 @@
  *   - Diversity (10%) — trades across many markets, not one lucky bet
  */
 
-export function scoreWallet(wallet) {
+export interface WalletTrade {
+  timestamp?: string | number;
+  side?: string;
+  size?: number | string;
+  price?: number;
+  market_id?: unknown;
+  condition_id?: unknown;
+  asset_id?: unknown;
+  pnl?: number;
+  resolved?: unknown;
+}
+
+export interface WalletInput {
+  address: string;
+  username?: string;
+  name?: string;
+  profit?: number;
+  trades?: WalletTrade[];
+  weeklyActive?: boolean;
+  weeklyPnl?: number;
+}
+
+export interface WalletMetrics {
+  efficiency: number;
+  consistency: number;
+  profit: number;
+  recency: number;
+  diversity: number;
+  totalTrades: number;
+  recentTrades: number;
+  volume: number;
+  buyRate: number;
+  avgTradeSize: number;
+  weeklyActive: boolean;
+  weeklyPnl: number;
+}
+
+export interface ScoredWallet {
+  address: string;
+  username: string;
+  score: number;
+  grade: string;
+  metrics: WalletMetrics;
+}
+
+export interface RejectedWallet extends WalletInput {
+  score: 0;
+  grade: "F";
+  reason: string;
+}
+
+export function scoreWallet(wallet: WalletInput): ScoredWallet | RejectedWallet {
   const trades = wallet.trades || [];
   const profit = wallet.profit || 0;
 
@@ -22,7 +73,7 @@ export function scoreWallet(wallet) {
   const buyRate = trades.length > 0 ? buys.length / trades.length : 0;
 
   // Trade size consistency — low variance in trade sizes = disciplined trader
-  const sizes = trades.map((t) => parseFloat(t.size) || 0).filter((s) => s > 0);
+  const sizes = trades.map((t) => parseFloat(String(t.size)) || 0).filter((s) => s > 0);
   const avgSize = sizes.reduce((a, b) => a + b, 0) / (sizes.length || 1);
   const sizeVariance = sizes.reduce((a, b) => a + (b - avgSize) ** 2, 0) / (sizes.length || 1);
   const sizeCV = avgSize > 0 ? Math.sqrt(sizeVariance) / avgSize : 10;
@@ -92,7 +143,7 @@ export function scoreWallet(wallet) {
   };
 }
 
-function getGrade(score) {
+function getGrade(score: number): string {
   if (score >= 0.85) return "A+";
   if (score >= 0.75) return "A";
   if (score >= 0.65) return "B+";
@@ -103,9 +154,11 @@ function getGrade(score) {
   return "F";
 }
 
-export function rankWallets(wallets) {
+export function rankWallets(wallets: WalletInput[]): ScoredWallet[] {
+  // A rejected wallet always has score 0, so "has metrics" adds no extra filtering;
+  // it only tells the type system what `score > 0` already guarantees.
   return wallets
     .map(scoreWallet)
-    .filter((w) => w.score > 0)
+    .filter((w): w is ScoredWallet => "metrics" in w && w.score > 0)
     .sort((a, b) => b.score - a.score);
 }

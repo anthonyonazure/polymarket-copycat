@@ -9,9 +9,9 @@
     "test": "bun test",
     "mutation": "stryker run",
     "check": "bun run typecheck && bun run lint",
-    "scan": "node src/scanner.js",
-    "paper": "node src/paper-trader.js",
-    "dashboard": "node src/dashboard.js",
+    "scan": "bun src/scanner.ts",
+    "paper": "bun src/paper-trader.ts",
+    "dashboard": "bun src/dashboard.ts",
     "live": "echo 'Set LIVE_MODE=true in .env first' && node src/live-trader.js"
   },
   "dependencies": {},
@@ -24,7 +24,7 @@
     "typescript-eslint": "^8.65.0"
   },
   "overrides": {
-    "fast-uri": "^3.1.5",
+    "fast-uri": "^3.1.6",
     "qs": "^6.15.2"
   }
 }
