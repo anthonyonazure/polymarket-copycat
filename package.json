@@ -1,7 +1,7 @@
 {
   "name": "polymarket-copycat",
   "version": "1.0.0",
-  "description": "Polymarket copy trading \u2014 scanner, paper trading, and live execution",
+  "description": "Polymarket copy trading — scanner, paper trading, and live execution",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -26,5 +26,8 @@
   "overrides": {
     "fast-uri": "^3.1.6",
     "qs": "^6.16.0"
+  },
+  "gauntlet": {
+    "coverageFloorPercent": 67
   }
 }

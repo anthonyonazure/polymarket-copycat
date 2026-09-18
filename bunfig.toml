@@ -1,0 +1,10 @@
+[test]
+# Coverage is reported here and ENFORCED by the gauntlet's tests gate, which
+# compares the "All files" row against package.json → gauntlet.coverageFloorPercent.
+#
+# There is deliberately no coverageThreshold line: bun applies a scalar
+# threshold per FILE, so one weak module fails the whole run while the output
+# reads "N pass, 0 fail" — and the number in this file reads like a project
+# floor to everyone who ever opens it. A gate has to mean what it appears to
+# mean, or nobody can act on it.
+coverage = true

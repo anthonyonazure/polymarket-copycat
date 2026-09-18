@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-schema.json",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "bun test"
+  },
+  "mutate": [
+    "src/api.ts",
+    "src/scorer.ts"
+  ],
+  "reporters": [
+    "progress",
+    "clear-text"
+  ],
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 50
+  }
+}
